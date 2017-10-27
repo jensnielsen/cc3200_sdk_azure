@@ -805,6 +805,27 @@ extern int HTTPCli_getResponseField(HTTPCli_Handle cli, char *value,
         int len, bool *moreFlag);
 
 /*!
+ *  @brief  Read the response header from the HTTP server
+ *
+ *  Repeatedly call this function until zero is returned.
+ *
+ *  @param[in]  cli       Instance of an HTTP client
+ *
+ *  @param[out] header    Buffer to hold Response Header string
+ *
+ *  @param[in]  len       Length of the buffer
+ *
+ *  @param[out] moreFlag  Flag set if the field value could not be completely
+ *                        read into `header`. A subsequent call to this function
+ *                        will read the remaining field value into `header`
+ *
+ *  @return The number of characters read (including NULL character) on
+ *          success or error code on failure
+ */
+extern int HTTPCli_readResponseHeader(HTTPCli_Handle cli, char *header,
+        int len, bool *moreFlag);
+
+/*!
  *  @brief  Read the parsed response body data from the HTTP server
  *
  *  This function parses the response body if the content type is chunked

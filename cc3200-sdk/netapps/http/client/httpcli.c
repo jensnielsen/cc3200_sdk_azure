@@ -40,7 +40,7 @@
 /* Configurable lengths */
 #define CONTENT_BUFLEN 128
 #define URI_BUFLEN 128
-#define SEND_BUFLEN 128
+#define SEND_BUFLEN 256
 #define MAX_FIELD_NAME_LEN 24
 
 #define STATUS_BUFLEN 16
@@ -1660,6 +1660,82 @@ int HTTPCli_getResponseField(HTTPCli_Handle cli, char *body, int len,
     }
 
     return (respFieldIndex);
+}
+
+int HTTPCli_readResponseHeader(HTTPCli_Handle cli, char *header, int len,
+        bool *moreFlag)
+{
+    char *value = NULL;
+    int ret;
+    int status;
+    int i;
+
+    xassert(cli != NULL);
+    xassert(header != NULL);
+    xassert(moreFlag != NULL);
+
+    /* Minimum size required to hold content length value */
+    if (len < 16) {
+        return (HTTPCli_ERECVBUFSMALL);
+    }
+
+    *moreFlag = false;
+    for (i = 0; i < len; i++) {
+        ret = bufferedRecv(cli, &(cli->ssock), header + i, 1, 0);
+        if (ret <= 0) {
+            break;
+        }
+
+        if (header[i] == ':') {
+            value = header + i;
+        }
+        else if ((header[i] == '\n') && (header[i - 1] == '\r')) {
+            header[i - 1] = '\0';
+            break;
+        }
+    }
+
+    if (ret >= 0) {
+
+        ret = i;
+        /*  Check if the entire data is read */
+        if (header[ret - 1] == '\0') {
+           /* If this is the end of headers */
+           if (!getCliState(cli, READ_FLAG) && (ret == 1)) {
+               ret = 0;
+           }
+           else {
+               setCliState(cli, READ_FLAG, false);
+           }
+        }
+        else {
+           setCliState(cli, READ_FLAG, true);
+           *moreFlag = true;
+        }
+
+        if (value != NULL) {
+            *value = '\0';
+
+            /* field value shouldn't have leading spaces */
+            i = 1;
+            while (*(value + i) == ' ') {
+                i++;
+            }
+
+            status = checkContentField(cli, header, (value + i), *moreFlag);
+            *value = ':';
+
+            if (status < 0) {
+                ret = status;
+                status = skipLine(cli);
+                if (status < 0) {
+                    ret = status;
+                }
+            }
+        }
+    }
+
+    return (ret);
 }
 
 /*
